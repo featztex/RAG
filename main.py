@@ -1,6 +1,10 @@
 import os
+import io
+import sys
 from mistralai import Mistral
 from config import api_key
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 key = api_key
 model = "mistral-large-latest"
@@ -11,7 +15,7 @@ test_response = client.chat.complete(
     messages=[
         {
             "role": "user",
-            "content": "What is the capital of Romania?"
+            "content": "Сколько лет Москве?"
         }
     ]
 )
