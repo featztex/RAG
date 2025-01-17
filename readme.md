@@ -1,1 +1,1 @@
-RAG from scratch with Mistral
+# RAG from scratch with Mistral API
