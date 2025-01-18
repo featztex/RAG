@@ -10,83 +10,75 @@ from tqdm import tqdm
 import os
 import gc
 
-mistral_api_key = api_key
+def RAG_pipline():
 
-def load_vectorstore(texts, embeddings, new=False):
+    mistral_api_key = api_key
 
-    index_path = "faiss_index"
-    vectorstore = None
-    print("Загрузка векторного хранилища...")
+    def load_vectorstore(texts, embeddings, new=False):
 
-    if os.path.exists(index_path) and new == False:
-        vectorstore = FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
-    else:
-        vectorstore = create_vectorstore(texts, embeddings)
-        vectorstore.save_local(index_path)
-    
-    return vectorstore
+        index_path = "faiss_index"
+        vectorstore = None
+        print("Загрузка векторного хранилища...")
 
-def create_vectorstore(texts, embeddings):
-
-    print("Создание нового векторного хранилища...")
-    batch_size = 16
-    vectorstore = None
-
-    for i in tqdm(range(0, len(texts), batch_size), desc="Обработка батчей"):
-        batch = texts[i:i + batch_size]
-        if vectorstore is None:
-            vectorstore = FAISS.from_documents(batch, embeddings)
+        if os.path.exists(index_path) and new == False:
+            vectorstore = FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
         else:
-            vectorstore.add_documents(batch)
-        gc.collect()
+            vectorstore = create_vectorstore(texts, embeddings)
+            vectorstore.save_local(index_path)
+        
+        return vectorstore
 
-    print("Векторное хранилище создано")
-    return vectorstore
+    def create_vectorstore(texts, embeddings):
 
+        print("Создание нового векторного хранилища...")
+        batch_size = 16
+        vectorstore = None
 
-# Загрузка данных и разделение на чанки
-print("Начало работы")
-loader = TextLoader("data/content.txt")
-documents = loader.load()
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-texts = text_splitter.split_documents(documents)
+        for i in tqdm(range(0, len(texts), batch_size), desc="Обработка батчей"):
+            batch = texts[i:i + batch_size]
+            if vectorstore is None:
+                vectorstore = FAISS.from_documents(batch, embeddings)
+            else:
+                vectorstore.add_documents(batch)
+            gc.collect()
 
-# FAISS
-print("Создание эмбеддингов...")
-# sentence-transformers/all-MiniLM-L6-v2, sentence-transformers/all-mpnet-base-v2, sergeyzh/LaBSE-ru-sts
-embeddings = HuggingFaceEmbeddings(
-    model_name="sergeyzh/LaBSE-ru-sts",
-    model_kwargs={'device': 'cpu'},
-    encode_kwargs={'normalize_embeddings': True}
-)
-vectorstore = load_vectorstore(texts, embeddings, new=False)
+        print("Векторное хранилище создано")
+        return vectorstore
 
 
-# Инициализация модели и cоздание RAG-цепочки
-llm = ChatMistralAI(mistral_api_key=mistral_api_key, model="mistral-large-latest", timeout=30)
+    # Загрузка данных и разделение на чанки
+    print("Начало работы")
+    loader = TextLoader("data/content.txt")
+    documents = loader.load()
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    texts = text_splitter.split_documents(documents)
 
-qa_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    chain_type="stuff",
-    retriever=vectorstore.as_retriever(
-        search_type="similarity", # mmr (lambda_mult), similarity_score_threshold (score_threshold)
-        search_kwargs={'k': 5, 'fetch_k': 15}
-    ),
-    return_source_documents=True
-)
+    # FAISS
+    print("Создание эмбеддингов...")
+    # sentence-transformers/all-MiniLM-L6-v2, sentence-transformers/all-mpnet-base-v2, sergeyzh/LaBSE-ru-sts
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sergeyzh/LaBSE-ru-sts",
+        model_kwargs={'device': 'cpu'},
+        encode_kwargs={'normalize_embeddings': True}
+    )
+    vectorstore = load_vectorstore(texts, embeddings, new=False)
 
 
-def ask_rag(question):
-    result = qa_chain.invoke({"query": question})
-    return result["result"], result["source_documents"]
+    # Инициализация модели и cоздание RAG-цепочки
+    llm = ChatMistralAI(mistral_api_key=mistral_api_key, model="mistral-large-latest", timeout=30)
 
-print("RAG-система готова. Введите вопрос или 'выход' для завершения.")
-while True:
-    user_input = input("Ваш вопрос: ")
-    if user_input.lower() == 'выход':
-        break
-    answer, sources = ask_rag(user_input)
-    print(f"Ответ: {answer}\n")
-    print('Источники:')
-    for source in sources:
-        print(f"- ...{source.page_content[:200]}...\n")
+    qa_chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=vectorstore.as_retriever(
+            search_type="similarity", # mmr (lambda_mult), similarity_score_threshold (score_threshold)
+            search_kwargs={'k': 5, 'fetch_k': 15}
+        ),
+        return_source_documents=True
+    )
+
+    return qa_chain
+
+def ask_rag(question, qa_chain):
+        result = qa_chain.invoke({"query": question})
+        return result["result"], result["source_documents"]
