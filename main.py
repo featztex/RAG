@@ -14,6 +14,15 @@ def RAG_pipline():
 
     mistral_api_key = api_key
 
+    def split_text(chunk_size=500, chunk_overlap=50, data_path="data/content.txt"):
+
+        loader = TextLoader(data_path)
+        documents = loader.load()
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        texts = text_splitter.split_documents(documents)
+
+        return texts
+
     def load_vectorstore(texts, embeddings, new=False):
 
         index_path = "faiss_index"
@@ -48,14 +57,10 @@ def RAG_pipline():
 
     # Загрузка данных и разделение на чанки
     print("Начало работы")
-    loader = TextLoader("data/content.txt")
-    documents = loader.load()
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    texts = text_splitter.split_documents(documents)
+    texts = split_text(chunk_size=500, chunk_overlap=50)
 
-    # FAISS
+    # Создание векторного хранилища
     print("Создание эмбеддингов...")
-    # sentence-transformers/all-MiniLM-L6-v2, sentence-transformers/all-mpnet-base-v2, sergeyzh/LaBSE-ru-sts
     embeddings = HuggingFaceEmbeddings(
         model_name="sergeyzh/LaBSE-ru-sts",
         model_kwargs={'device': 'cpu'},
@@ -65,7 +70,11 @@ def RAG_pipline():
 
 
     # Инициализация модели и cоздание RAG-цепочки
-    llm = ChatMistralAI(mistral_api_key=mistral_api_key, model="mistral-large-latest", timeout=30)
+    llm = ChatMistralAI(
+        mistral_api_key=mistral_api_key, 
+        model="mistral-large-latest", 
+        timeout=30
+    )
 
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,
