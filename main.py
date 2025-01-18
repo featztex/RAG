@@ -7,7 +7,6 @@ from langchain.chains import RetrievalQA
 from langchain_community.document_loaders import TextLoader
 
 from tqdm import tqdm
-from multiprocessing import Pool, cpu_count
 import os
 import gc
 
@@ -17,12 +16,11 @@ def load_vectorstore(texts, embeddings, new=False):
 
     index_path = "faiss_index"
     vectorstore = None
+    print("Загрузка векторного хранилища...")
 
     if os.path.exists(index_path) and new == False:
-        print("Загрузка существующего индекса...")
         vectorstore = FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
     else:
-        print("Создание нового индекса...")
         vectorstore = create_vectorstore(texts, embeddings)
         vectorstore.save_local(index_path)
     
@@ -30,7 +28,7 @@ def load_vectorstore(texts, embeddings, new=False):
 
 def create_vectorstore(texts, embeddings):
 
-    print("Создание векторного хранилища...")
+    print("Создание нового векторного хранилища...")
     batch_size = 16
     vectorstore = None
 
@@ -47,15 +45,20 @@ def create_vectorstore(texts, embeddings):
 
 
 # Загрузка данных и разделение на чанки
+print("Начало работы")
 loader = TextLoader("data/content.txt")
 documents = loader.load()
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
 texts = text_splitter.split_documents(documents)
 
 # FAISS
 print("Создание эмбеддингов...")
-# all-MiniLM-L6-v2, all-mpnet-base-v2
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
+# sentence-transformers/all-MiniLM-L6-v2, sentence-transformers/all-mpnet-base-v2, sergeyzh/LaBSE-ru-sts
+embeddings = HuggingFaceEmbeddings(
+    model_name="sergeyzh/LaBSE-ru-sts",
+    model_kwargs={'device': 'cpu'},
+    encode_kwargs={'normalize_embeddings': True}
+)
 vectorstore = load_vectorstore(texts, embeddings, new=False)
 
 
@@ -66,8 +69,8 @@ qa_chain = RetrievalQA.from_chain_type(
     llm=llm,
     chain_type="stuff",
     retriever=vectorstore.as_retriever(
-        search_type="similarity", # mmr, similarity_score_threshold
-        search_kwargs={'k': 3, 'fetch_k': 10}
+        search_type="similarity", # mmr (lambda_mult), similarity_score_threshold (score_threshold)
+        search_kwargs={'k': 5, 'fetch_k': 15}
     ),
     return_source_documents=True
 )
@@ -82,5 +85,8 @@ while True:
     user_input = input("Ваш вопрос: ")
     if user_input.lower() == 'выход':
         break
-    answer, _ = ask_rag(user_input)
+    answer, sources = ask_rag(user_input)
     print(f"Ответ: {answer}\n")
+    print('Источники:')
+    for source in sources:
+        print(f"- ...{source.page_content[:200]}...\n")
