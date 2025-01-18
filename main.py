@@ -56,7 +56,7 @@ texts = text_splitter.split_documents(documents)
 print("Создание эмбеддингов...")
 # all-MiniLM-L6-v2, all-mpnet-base-v2
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
-vectorstore = load_vectorstore(texts, embeddings, new=True)
+vectorstore = load_vectorstore(texts, embeddings, new=False)
 
 
 # Инициализация модели и cоздание RAG-цепочки
@@ -65,20 +65,22 @@ llm = ChatMistralAI(mistral_api_key=mistral_api_key, model="mistral-large-latest
 qa_chain = RetrievalQA.from_chain_type(
     llm=llm,
     chain_type="stuff",
-    retriever=vectorstore.as_retriever(),
+    retriever=vectorstore.as_retriever(
+        search_type="similarity", # mmr, similarity_score_threshold
+        search_kwargs={'k': 3, 'fetch_k': 10}
+    ),
     return_source_documents=True
 )
 
 
-# Пример использования
 def ask_rag(question):
     result = qa_chain.invoke({"query": question})
     return result["result"], result["source_documents"]
 
-question = "Как звали разведчиков, отправившихся за стену в 1 серии?"
-answer, sources = ask_rag(question)
-
-print(f"Ответ: {answer}\n")
-print("Источники:")
-for source in sources:
-    print(f"- {source.page_content[:100]}...")
+print("RAG-система готова. Введите вопрос или 'выход' для завершения.")
+while True:
+    user_input = input("Ваш вопрос: ")
+    if user_input.lower() == 'выход':
+        break
+    answer, _ = ask_rag(user_input)
+    print(f"Ответ: {answer}\n")
