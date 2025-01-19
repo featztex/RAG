@@ -39,6 +39,9 @@ def get_paraphrased_queries(query, num_attempts, llm):
     """
     if num_attempts <= 1:
         return [query]
+    
+    if num_attempts > 6:
+        num_attempts = 6
 
     paraphrase_prompt = f"Перефразируй следующий вопрос {num_attempts} разными способами, \
                         сохраняя смысл. Напиши только перефразированные версии, \
@@ -282,10 +285,13 @@ def start_dialogue(sources=False, len_sources=None, num_attempts=1, all_answers=
           \nДля выхода введите 'выход'\n")
 
     while True:
+
         user_input = input("Ваш вопрос: ")
         if user_input.lower() == 'выход':
             break
-        
+
+        start_time = time.time()
+
         responses = get_multiple_responses(user_input, qa_chain, num_attempts)
         best_answer, best_sources = select_best_response(responses)
 
@@ -296,3 +302,6 @@ def start_dialogue(sources=False, len_sources=None, num_attempts=1, all_answers=
         
         if sources:
             print_sources(best_sources, len_sources)
+
+        end_time = time.time()
+        print(f"Время ответа: {round(end_time - start_time, 3)}\n")
