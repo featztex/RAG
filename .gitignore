@@ -3,3 +3,5 @@ config.py
 __pycache__
 test.py
 faiss_index
+data/game_of_thrones_episodes
+data/game_of_thrones_heroes
