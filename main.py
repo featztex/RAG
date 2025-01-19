@@ -5,8 +5,11 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain.chains import RetrievalQA
 from langchain_community.document_loaders import TextLoader
+from langchain_community.retrievers import TFIDFRetriever
+from langchain.retrievers import EnsembleRetriever
 
 from tqdm import tqdm
+import time
 import os
 import gc
 
@@ -59,7 +62,7 @@ def RAG_pipline():
     print("Начало работы")
     texts = split_text(chunk_size=500, chunk_overlap=50)
 
-    # Создание векторного хранилища
+    # Создание векторного хранилища FAISS
     print("Создание эмбеддингов...")
 
     embeddings = HuggingFaceEmbeddings(
@@ -70,24 +73,36 @@ def RAG_pipline():
 
     vectorstore = load_vectorstore(texts, embeddings, new=False)
 
+     # Создание ретривера
+    faiss_retriever = vectorstore.as_retriever(
+        search_type="similarity",  # mmr (lambda_mult), similarity_score_threshold (score_threshold)
+        search_kwargs={'k': 5, 'fetch_k': 15}
+    )
+
+    tfidf_retriever = TFIDFRetriever.from_documents(texts, k=5)
+
+    ensemble_retriever = EnsembleRetriever(
+        retrievers=[faiss_retriever, tfidf_retriever],
+        weights=[0.75, 0.25]
+    )
+
     # Инициализация модели и cоздание RAG-цепочки
     llm = ChatMistralAI(
         mistral_api_key=mistral_api_key, 
         model="mistral-large-latest", 
-        timeout=30
+        timeout=10
     )
 
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
-        retriever=vectorstore.as_retriever(
-            search_type="similarity", # mmr (lambda_mult), similarity_score_threshold (score_threshold)
-            search_kwargs={'k': 8, 'fetch_k': 20}
-        ),
+        retriever=ensemble_retriever,
         return_source_documents=True
     )
 
     return qa_chain
+
+
 
 def ask_rag(question, qa_chain):
         result = qa_chain.invoke({"query": question})
@@ -111,5 +126,3 @@ def start_dialogue(sources=False, len_sources=100):
             print('Источники:')
             for s in all_sources:
                 print(f"- ...{s.page_content[:len_sources]}...\n")
-
-#RAG_pipline()
