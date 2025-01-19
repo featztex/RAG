@@ -305,3 +305,8 @@ def start_dialogue(sources=False, len_sources=None, num_attempts=1, all_answers=
 
         end_time = time.time()
         print(f"Время ответа: {round(end_time - start_time, 3)}\n")
+    
+def bot_mode(question):
+    qa_chain = RAG_pipeline()
+    answer = ask_rag(question, qa_chain)
+    return answer
