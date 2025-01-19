@@ -1,16 +1,8 @@
 from config import api_key
 from langchain_mistralai import ChatMistralAI
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from langchain.chains import RetrievalQA
-from langchain_community.document_loaders import TextLoader
-from langchain_community.retrievers import TFIDFRetriever
-from langchain.retrievers import EnsembleRetriever
+from RAG_pipeline import RAG_pipeline
 
-from tqdm import tqdm
 import time
-import os
 import gc
 import re
 
@@ -40,6 +32,8 @@ def get_multiple_responses(query, qa_chain, num_attempts):
         paraphrased = llm.invoke(paraphrase_prompt).content
         paraphrased_queries = [query] + [q.strip() for q in paraphrased.split('\n') if q.strip()][:num_attempts-1]
         time.sleep(1)
+    else:
+        paraphrased_queries = [query]
 
     # Получаем ответы на все версии запроса
     for q in paraphrased_queries:
@@ -51,6 +45,7 @@ def get_multiple_responses(query, qa_chain, num_attempts):
             "confidence_score": calculate_confidence(answer, sources)
         })
         time.sleep(1)
+        gc.collect()
     
     return responses
 
@@ -146,99 +141,8 @@ def select_best_response(responses):
 
 
 
-def RAG_pipline():
-
-    mistral_api_key = api_key
-
-    def split_text(chunk_size=500, chunk_overlap=50, data_path="data/all_content.txt"):
-
-        loader = TextLoader(data_path)
-        documents = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-        texts = text_splitter.split_documents(documents)
-
-        return texts
-
-    def load_vectorstore(texts, embeddings, new=False):
-
-        index_path = "faiss_index"
-        vectorstore = None
-        print("Загрузка векторного хранилища...")
-
-        if os.path.exists(index_path) and new == False:
-            vectorstore = FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
-        else:
-            vectorstore = create_vectorstore(texts, embeddings)
-            vectorstore.save_local(index_path)
-        
-        return vectorstore
-
-    def create_vectorstore(texts, embeddings):
-
-        print("Создание нового векторного хранилища...")
-        batch_size = 16
-        vectorstore = None
-
-        for i in tqdm(range(0, len(texts), batch_size), desc="Обработка батчей"):
-            batch = texts[i:i + batch_size]
-            if vectorstore is None:
-                vectorstore = FAISS.from_documents(batch, embeddings)
-            else:
-                vectorstore.add_documents(batch)
-            gc.collect()
-
-        print("Векторное хранилище создано")
-        return vectorstore
-
-
-    # Загрузка данных и разделение на чанки
-    print("Начало работы")
-    texts = split_text(chunk_size=500, chunk_overlap=50)
-
-    # Создание векторного хранилища FAISS
-    print("Создание эмбеддингов...")
-
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sergeyzh/LaBSE-ru-sts",
-        model_kwargs={'device': 'cpu'},
-        encode_kwargs={'normalize_embeddings': True}
-    )
-
-    vectorstore = load_vectorstore(texts, embeddings, new=False)
-
-     # Создание ретривера
-    faiss_retriever = vectorstore.as_retriever(
-        search_type="similarity",  # mmr (lambda_mult), similarity_score_threshold (score_threshold)
-        search_kwargs={'k': 5, 'fetch_k': 15}
-    )
-
-    tfidf_retriever = TFIDFRetriever.from_documents(texts, k=5)
-
-    ensemble_retriever = EnsembleRetriever(
-        retrievers=[faiss_retriever, tfidf_retriever],
-        weights=[0.75, 0.25]
-    )
-
-    # Инициализация модели и cоздание RAG-цепочки
-    llm = ChatMistralAI(
-        mistral_api_key=mistral_api_key, 
-        model="mistral-large-latest", 
-        timeout=10
-    )
-
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=ensemble_retriever,
-        return_source_documents=True
-    )
-
-    return qa_chain
-
-
-
 def start_dialogue(sources=False, len_sources=None, num_attempts=1, all_answers=False):
-    qa_chain = RAG_pipline()
+    qa_chain = RAG_pipeline()
     print(f"\nRAG-система готова. Введите Ваш вопрос. \
           \nДля выхода введите 'выход'\n")
 
