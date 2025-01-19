@@ -14,7 +14,7 @@ def RAG_pipline():
 
     mistral_api_key = api_key
 
-    def split_text(chunk_size=500, chunk_overlap=50, data_path="data/content.txt"):
+    def split_text(chunk_size=500, chunk_overlap=50, data_path="data/all_content.txt"):
 
         loader = TextLoader(data_path)
         documents = loader.load()
@@ -81,7 +81,7 @@ def RAG_pipline():
         chain_type="stuff",
         retriever=vectorstore.as_retriever(
             search_type="similarity", # mmr (lambda_mult), similarity_score_threshold (score_threshold)
-            search_kwargs={'k': 5, 'fetch_k': 15}
+            search_kwargs={'k': 8, 'fetch_k': 20}
         ),
         return_source_documents=True
     )
@@ -91,3 +91,5 @@ def RAG_pipline():
 def ask_rag(question, qa_chain):
         result = qa_chain.invoke({"query": question})
         return result["result"], result["source_documents"]
+
+#RAG_pipline()
