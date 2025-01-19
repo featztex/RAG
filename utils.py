@@ -78,7 +78,6 @@ def load_or_create_vectorstore(texts, embeddings, new=False):
 
     index_path = "faiss_index"
     vectorstore = None
-    print("Загрузка векторного хранилища...")
 
     if os.path.exists(index_path) and new == False:
         vectorstore = FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
