@@ -61,13 +61,14 @@ def RAG_pipline():
 
     # Создание векторного хранилища
     print("Создание эмбеддингов...")
+
     embeddings = HuggingFaceEmbeddings(
         model_name="sergeyzh/LaBSE-ru-sts",
         model_kwargs={'device': 'cpu'},
         encode_kwargs={'normalize_embeddings': True}
     )
-    vectorstore = load_vectorstore(texts, embeddings, new=False)
 
+    vectorstore = load_vectorstore(texts, embeddings, new=False)
 
     # Инициализация модели и cоздание RAG-цепочки
     llm = ChatMistralAI(
@@ -91,5 +92,24 @@ def RAG_pipline():
 def ask_rag(question, qa_chain):
         result = qa_chain.invoke({"query": question})
         return result["result"], result["source_documents"]
+
+def start_dialogue(sources=False, len_sources=100):
+
+    qa_chain = RAG_pipline()
+    print("\nRAG-система готова. Введите Ваш вопрос. \
+          \nЕсли ответ Вас не устраивает, попробуйте переформулировать вопрос. \
+          \nДля выхода введите 'выход'\n")
+
+    while True:
+        user_input = input("Ваш вопрос: ")
+        if user_input.lower() == 'выход':
+            break
+        answer, all_sources = ask_rag(user_input, qa_chain)
+        print(f"Ответ: {answer}\n")
+
+        if sources == True:
+            print('Источники:')
+            for s in all_sources:
+                print(f"- ...{s.page_content[:len_sources]}...\n")
 
 #RAG_pipline()
