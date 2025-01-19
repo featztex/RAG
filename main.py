@@ -14,25 +14,32 @@ import os
 import gc
 import re
 
-def get_multiple_responses(query, qa_chain, num_attempts=5):
+
+def ask_rag(question, qa_chain):
+        result = qa_chain.invoke({"query": question})
+        return result["result"], result["source_documents"]
+
+
+def get_multiple_responses(query, qa_chain, num_attempts):
     """
     Получает несколько ответов на перефразированные версии запроса
     """
     responses = []
     
     # Получаем перефразированные версии запроса
-    paraphrase_prompt = f"Перефразируй следующий вопрос {num_attempts} разными способами, сохраняя смысл. Напиши только перефразированные версии, каждую с новой строки: {query}"
+    if num_attempts > 1:
     
-    llm = ChatMistralAI(
-        mistral_api_key=api_key,
-        model="mistral-large-latest",
-        timeout=10
-    )
-    
-    # Исправляем извлечение текста из ответа модели
-    paraphrased = llm.invoke(paraphrase_prompt).content
-    paraphrased_queries = [query] + [q.strip() for q in paraphrased.split('\n') if q.strip()][:num_attempts-1]
-    time.sleep(1)
+        paraphrase_prompt = f"Перефразируй следующий вопрос {num_attempts} разными способами, сохраняя смысл. Напиши только перефразированные версии, каждую с новой строки: {query}"
+        
+        llm = ChatMistralAI(
+            mistral_api_key=api_key,
+            model="mistral-large-latest",
+            timeout=10
+        )
+        
+        paraphrased = llm.invoke(paraphrase_prompt).content
+        paraphrased_queries = [query] + [q.strip() for q in paraphrased.split('\n') if q.strip()][:num_attempts-1]
+        time.sleep(1)
 
     # Получаем ответы на все версии запроса
     for q in paraphrased_queries:
@@ -110,12 +117,7 @@ def calculate_confidence(answer, sources):
         "я не уверен", "это спорный вопрос",
         "нельзя сказать точно", "под вопросом",
         "требует уточнения", "нет точных данных",
-        "недостаточно информации", "не могу точно сказать",
-        "примерно", "около", "приблизительно",
-        "где-то", "как-то так", "типа того",
-        "в некотором роде", "своего рода",
-        "отчасти", "в какой-то степени",
-        "более-менее", "относительно"
+        "недостаточно информации", "не могу точно сказать"
     ]
     
     # Прямые указания на незнание
@@ -235,16 +237,9 @@ def RAG_pipline():
 
 
 
-def ask_rag(question, qa_chain):
-        result = qa_chain.invoke({"query": question})
-        return result["result"], result["source_documents"]
-
-
-
-def start_dialogue(sources=False, len_sources=100):
+def start_dialogue(sources=False, len_sources=None, num_attempts=1, all_answers=False):
     qa_chain = RAG_pipline()
-    print("\nRAG-система готова. Введите Ваш вопрос. \
-          \nСистема автоматически перефразирует ваш вопрос и выберет лучший ответ. \
+    print(f"\nRAG-система готова. Введите Ваш вопрос. \
           \nДля выхода введите 'выход'\n")
 
     while True:
@@ -252,18 +247,19 @@ def start_dialogue(sources=False, len_sources=100):
         if user_input.lower() == 'выход':
             break
         
-        print("Генерация нескольких вариантов ответа...")
-        responses = get_multiple_responses(user_input, qa_chain)
+        responses = get_multiple_responses(user_input, qa_chain, num_attempts)
         best_answer, best_sources = select_best_response(responses)
 
-        print("\n=== Все варианты ответов ===")
-        for i, resp in enumerate(responses, 1):
-            print(f"\n--- Вариант {i} ---")
-            print(f"Перефразированный вопрос: {resp['query']}")
-            print(f"Ответ: {resp['response']}")
-            print(f"Оценка уверенности: {resp['confidence_score']:.2f}")
-        
-        print(f"\nЛучший ответ: {best_answer}\n")
+        if all_answers:
+            print("\n=== Все варианты ответов ===")
+            for i, resp in enumerate(responses, 1):
+                print(f"\n--- Вариант {i} ---")
+                print(f"Перефразированный вопрос: {resp['query']}")
+                print(f"Ответ: {resp['response']}")
+                print(f"Оценка уверенности: {resp['confidence_score']:.2f}")
+            print(f"\nЛучший ответ: {best_answer}\n")
+        else:
+            print(f"Ответ: {best_answer}\n")
         
         if sources:
             print('Источники:')
