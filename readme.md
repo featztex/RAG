@@ -14,13 +14,12 @@
    cd RAG
    ```
 2. Получите доступ к моделям MistralAI на [сайте](https://mistral.ai/) и сохраните его в файл config.py
-    ```python
+    ```python title="config.py"
    api_key = "<your MistralAI API key>"
    ```
 
 ## Пример использования
 Пример запуска модели и комментарии к параметрам диалоговой функции можно найти в файле dialogue.py
-**config.py**
 ```python
 from main import start_dialogue
 start_dialogue()
