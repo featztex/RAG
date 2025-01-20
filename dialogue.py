@@ -1,4 +1,19 @@
-﻿from main import start_dialogue
+﻿from main import fast_answer, start_dialogue
+from RAG_pipeline import RAG_pipeline
+
+# 1. быстрый ответ на вопрос с одним обращением к модели
+
+fast_answer()
+
+# 2. если вы хотите задать несколько вопросов, но не входить в диалоговый режим, то
+# для оптимизации времени работы рекомендуется предварительно инициализировать RAG-цепочку
+
+qa_chain = RAG_pipeline()
+
+fast_answer(qa_chain)
+fast_answer(qa_chain)
+
+# 3. диалоговый режим (рекомендуется)
 
 start_dialogue(
     sources=False,         # определяет видимость списка источников, на которые опиралась модель
