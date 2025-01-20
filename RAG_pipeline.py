@@ -36,7 +36,7 @@ def RAG_pipeline():
     llm = initialize_llm(api_key)
     
     end_time = time.time()
-    print(f"Время создания RAG: {round(end_time - start_time, 3)}")
+    # print(f"Время создания RAG: {round(end_time - start_time, 3)}")
 
     # Создание RAG цепочки
     return RetrievalQA.from_chain_type(
