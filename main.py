@@ -74,7 +74,7 @@ def get_multiple_responses(query, qa_chain, num_attempts):
     llm = ChatMistralAI(
         mistral_api_key=api_key,
         model="mistral-large-latest",
-        timeout=10
+        timeout=20
     )
     
     paraphrased_queries = get_paraphrased_queries(query, num_attempts, llm)
@@ -305,8 +305,3 @@ def start_dialogue(sources=False, len_sources=None, num_attempts=1, all_answers=
 
         end_time = time.time()
         print(f"Время ответа: {round(end_time - start_time, 3)}\n")
-    
-def bot_mode(question):
-    qa_chain = RAG_pipeline()
-    answer = ask_rag(question, qa_chain)
-    return answer
