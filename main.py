@@ -15,7 +15,7 @@ def ask_rag(question, qa_chain):
 
     Args:
         question (str): Вопрос пользователя
-        qa_chain: Цепочка вопрос-ответ RAG системы
+        qa_chain: Цепочка RAG системы
 
     Returns:
         tuple: (ответ модели, использованные источники)
@@ -304,4 +304,20 @@ def start_dialogue(sources=False, len_sources=None, num_attempts=1, all_answers=
             print_sources(best_sources, len_sources)
 
         end_time = time.time()
-        print(f"Время ответа: {round(end_time - start_time, 3)}\n")
+        # print(f"Время ответа: {round(end_time - start_time, 3)}\n")
+
+def fast_answer(qa_chain=None):
+    """
+    Отвечает на один вопрос с помощью RAG системы
+
+    Args:
+        qa_chain: Цепочка RAG системы 
+    """
+
+    if qa_chain == None:
+        qa_chain = RAG_pipeline()
+
+    print(f"\nRAG-система готова. Введите Ваш вопрос.\n")
+    question = input("Ваш вопрос: ")
+    answer, _ = ask_rag(question, qa_chain)
+    print(f"Ответ: {answer}\n")
