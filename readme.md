@@ -65,7 +65,8 @@ start_dialogue()
 ## Работа бота
 
 Работа с ботом начинается с команды `/start`:
-![start](bot_images/1.jpg)
+
+<img src="bot_images/1.jpg" width="500" height="auto">
 
 Текст
 
