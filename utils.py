@@ -127,5 +127,5 @@ def initialize_llm(api_key, model_name="mistral-large-latest"):
     return ChatMistralAI(
         mistral_api_key=api_key,
         model=model_name,
-        timeout=10
+        timeout=20
     )
